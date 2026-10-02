@@ -94,10 +94,29 @@
   }
 
   function switchTab(tabName) {
-    $$('.tab-panel').forEach((panel) => panel.classList.toggle('hidden', panel.id !== `tab-${tabName}`));
-    $$('[data-tab]').forEach((button) => button.classList.toggle('active', button.dataset.tab === tabName));
+    const activePanel = document.getElementById(`tab-${tabName}`);
+    if (!activePanel) return;
+
+    $$('.tab-panel').forEach((panel) => {
+      const isActive = panel === activePanel;
+      panel.hidden = !isActive;
+      panel.classList.toggle('hidden', !isActive);
+    });
+    $$('button[data-tab]').forEach((button) => button.classList.toggle('active', button.dataset.tab === tabName));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  // La navegación no depende de Supabase: funciona incluso si falla la carga de datos.
+  function bindNavigation() {
+    document.addEventListener('click', (event) => {
+      const tabButton = event.target.closest('button[data-tab]');
+      if (!tabButton) return;
+      event.preventDefault();
+      switchTab(tabButton.dataset.tab);
+    });
+  }
+
+  bindNavigation();
 
   function getPurchaseValues() {
     const totalCents = Math.round(Number($('#total-amount').value || 0) * 100);
