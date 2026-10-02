@@ -1,44 +1,81 @@
 # Finanzas MF
 
-Aplicación estática para registrar compras, cuotas y pagos. Se publica con **GitHub Pages** y persiste los datos en **Supabase**. Ya no usa Google Apps Script ni Google Sheets.
+Billetera web privada publicada con **GitHub Pages** y respaldada por **Supabase**. Permite registrar ingresos, egresos y compras Cashea personales o compartidas entre Anny y Danny. No usa Google Apps Script ni Google Sheets.
 
-## Antes de publicar
+## Privacidad
 
-1. En Supabase, abre **SQL Editor → New query**.
-2. Copia y ejecuta por completo `supabase-setup.sql`. Esto crea las tablas, las reglas privadas de acceso (RLS) y la operación segura para registrar pagos.
-3. En **Authentication → Providers → Email**, deja habilitado Email. Para simplificar el primer acceso puedes desactivar temporalmente `Confirm email`; si lo mantienes activado, el usuario debe confirmar el correo recibido.
-4. En **Authentication → URL Configuration**, configura:
-   - `Site URL`: `https://TU_USUARIO.github.io/Finanzas-MF/`
-   - `Redirect URLs`: añade la misma dirección. Mientras pruebas localmente, añade también `http://localhost:5500/` si usas Live Server.
-5. `config.js` ya usa el Project URL correcto (`https://bxoykyderhdupuhfzfdx.supabase.co`) y la **Publishable key**. Esta clave es pública por diseño; la seguridad de los datos depende de las reglas RLS instaladas en el paso 2. No agregues claves `sb_secret_`, `service_role` ni contraseñas al repositorio.
+- Los ingresos y egresos pertenecen exclusivamente a la cuenta que los creó.
+- Una compra Cashea **Personal** sólo puede verla y abonarla su dueño.
+- Una compra Cashea **Compartida** puede ser vista y abonada únicamente por estas dos cuentas:
+  - Anny: `fontanamarianni@gmail.com`
+  - Danny: `josedgonzalezm127@gmail.com`
+- Las compras que ya existían antes de esta actualización quedan privadas automáticamente.
+- La seguridad se aplica en PostgreSQL mediante Row Level Security (RLS), no sólo ocultando elementos de la pantalla.
 
-## Publicar en GitHub Pages
+> Si el correo de Danny no es correcto, cámbialo tanto en `config.js` como en la función `is_finanzas_pair` de `supabase-setup.sql` **antes** de usar cuentas compartidas.
 
-1. Crea el repositorio público `Finanzas-MF` en GitHub.
-2. En esta carpeta, ejecuta en PowerShell (sustituye `TU_USUARIO`):
+## Paso obligatorio: actualizar Supabase
+
+Aunque ya ejecutaste una versión anterior, debes ejecutar otra vez el archivo actualizado:
+
+1. Abre tu proyecto **Finanzas-MF** en Supabase.
+2. Ve a **SQL Editor → New query**.
+3. Abre `supabase-setup.sql` en este proyecto, copia todo y pégalo en el editor SQL.
+4. Pulsa **Run**.
+5. El resultado correcto es `Success. No rows returned`.
+
+El script conserva los datos existentes, agrega la tabla privada de movimientos, añade la opción compartida y reemplaza las políticas RLS anteriores.
+
+## Cuentas de acceso
+
+Cada persona debe crear su propia cuenta desde la aplicación:
+
+- Anny inicia sesión con `fontanamarianni@gmail.com`.
+- Danny inicia sesión con `josedgonzalezm127@gmail.com`.
+
+En **Authentication → Providers → Email**, mantén obligatoriamente activado **Confirm email** antes de que se registren las cuentas. Cada persona debe confirmar el mensaje recibido; esto demuestra que controla el correo autorizado. Nunca compartan contraseñas.
+
+En **Authentication → URL Configuration** configura:
+
+- `Site URL`: `https://fontanamarianni-svg.github.io/Finanzas-MF/`
+- `Redirect URLs`: agrega la misma dirección.
+
+## Actualizar GitHub Pages
+
+Sube o reemplaza estos cinco archivos en el repositorio `Finanzas-MF`:
+
+- `index.html`
+- `app.js`
+- `config.js`
+- `supabase-setup.sql`
+- `README.md`
+
+Desde la web de GitHub puedes usar **Add file → Upload files**, arrastrarlos y pulsar **Commit changes**. GitHub Pages actualizará la aplicación en unos minutos:
+
+`https://fontanamarianni-svg.github.io/Finanzas-MF/`
+
+Si prefieres PowerShell y el repositorio local ya está conectado:
 
 ```powershell
-git init
 git add index.html app.js config.js supabase-setup.sql README.md
-git commit -m "Crear Finanzas MF con Supabase"
-git branch -M main
-git remote add origin https://github.com/TU_USUARIO/Finanzas-MF.git
-git push -u origin main
+git commit -m "Agregar billetera privada y Cashea compartido"
+git push
 ```
 
-3. En GitHub abre **Settings → Pages** y selecciona `Deploy from a branch`, rama `main` y carpeta `/(root)`.
-4. Espera la publicación y entra en `https://TU_USUARIO.github.io/Finanzas-MF/`.
+## Cómo probar
 
-## Uso
-
-- Crea una cuenta con correo y contraseña de al menos ocho caracteres.
-- Registra una compra. La inicial se descuenta del financiamiento antes de repartir la deuda.
-- Registra cada abono indicando quién pagó. El saldo y el estado se actualizan de forma atómica en Supabase.
-- Cada cuenta sólo puede leer sus propias compras y pagos.
+1. Entra con la cuenta de Anny y registra un ingreso y un egreso.
+2. Registra una compra Cashea **Personal**.
+3. Registra otra compra Cashea **Compartida**.
+4. Cierra sesión e inicia con la cuenta de Danny.
+5. Danny debe ver solamente la compra compartida. No debe ver los ingresos, egresos ni la compra personal de Anny.
+6. Registra un abono desde Danny, vuelve a entrar como Anny y comprueba que el saldo compartido se actualizó.
 
 ## Archivos
 
-- `index.html`: interfaz estática compatible con GitHub Pages.
-- `app.js`: autenticación, validación, consultas y renderizado.
-- `config.js`: URL del proyecto y clave publishable pública de Supabase.
-- `supabase-setup.sql`: esquema, RLS y función transaccional de pagos.
+- `index.html`: interfaz responsive y pestañas de la billetera.
+- `app.js`: autenticación, formularios, cálculos y consultas a Supabase.
+- `config.js`: URL, clave publishable y correos usados por la identidad y los controles de interfaz; la autorización real se aplica nuevamente en SQL.
+- `supabase-setup.sql`: tablas, migración, políticas RLS y pago transaccional.
+
+La clave `sb_publishable_...` puede estar en el navegador. Nunca agregues claves `sb_secret_`, `service_role` ni contraseñas al repositorio.

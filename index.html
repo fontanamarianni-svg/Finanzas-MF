@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#111827">
+  <meta name="theme-color" content="#0b0508">
+  <meta name="description" content="Billetera privada para ingresos, egresos y compras Cashea personales o compartidas.">
   <title>Finanzas MF</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } } };
+    tailwind.config = { theme: { extend: { colors: { wine: { 400: '#b94062', 500: '#982b4b', 600: '#7c1f3b', 700: '#62172f', 900: '#32101c' } }, fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } } };
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,98 +16,106 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
 </head>
-<body class="min-h-screen bg-slate-950 font-sans text-slate-100">
-  <div id="notice" class="fixed right-4 top-4 z-50 hidden max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl"></div>
+<body class="min-h-screen bg-[#090609] font-sans text-slate-100 antialiased">
+  <div id="notice" role="status" aria-live="polite" class="fixed right-4 top-4 z-[70] hidden max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl"></div>
 
   <main id="auth-view" class="mx-auto flex min-h-screen max-w-md items-center px-5 py-10">
-    <section class="w-full rounded-3xl border border-slate-800 bg-slate-900 p-7 shadow-2xl shadow-black/30">
-      <div class="mb-8">
-        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-xl font-black text-slate-950">MF</div>
-        <h1 class="text-2xl font-extrabold tracking-tight">Finanzas MF</h1>
-        <p class="mt-1 text-sm text-slate-400">Tus compras, cuotas y pagos en un solo lugar.</p>
+    <section class="w-full overflow-hidden rounded-3xl border border-wine-900/70 bg-[#130d12] shadow-2xl shadow-black/40">
+      <div class="h-1.5 bg-gradient-to-r from-red-600 via-wine-500 to-violet-600"></div>
+      <div class="p-7 sm:p-8">
+        <div class="mb-8">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-wine-700 text-xl font-black text-white shadow-lg shadow-red-950/50">MF</div>
+          <p class="text-xs font-bold uppercase tracking-[.2em] text-wine-400">Billetera privada</p>
+          <h1 class="mt-2 text-3xl font-extrabold tracking-tight">Finanzas MF</h1>
+          <p class="mt-2 text-sm leading-6 text-slate-400">Controla tus ingresos, gastos y compras Cashea con privacidad por cuenta.</p>
+        </div>
+        <form id="auth-form" class="space-y-4">
+          <div><label for="auth-email" class="label">Correo electrónico</label><input id="auth-email" type="email" required autocomplete="email" class="input" placeholder="tu-correo@ejemplo.com"></div>
+          <div><label for="auth-password" class="label">Contraseña</label><input id="auth-password" type="password" required minlength="8" autocomplete="current-password" class="input" placeholder="Mínimo 8 caracteres"></div>
+          <button id="auth-submit" class="btn-primary w-full" type="submit">Iniciar sesión</button>
+        </form>
+        <button id="auth-toggle" class="mt-5 w-full text-sm font-semibold text-wine-400 hover:text-red-300">Crear una cuenta</button>
+        <p id="auth-help" class="mt-5 text-center text-xs leading-5 text-slate-500">Cada cuenta mantiene privados sus ingresos y egresos.</p>
       </div>
-      <form id="auth-form" class="space-y-4">
-        <div>
-          <label for="auth-email" class="mb-1.5 block text-sm font-medium text-slate-300">Correo electrónico</label>
-          <input id="auth-email" type="email" required autocomplete="email" class="input" placeholder="tu-correo@ejemplo.com">
-        </div>
-        <div>
-          <label for="auth-password" class="mb-1.5 block text-sm font-medium text-slate-300">Contraseña</label>
-          <input id="auth-password" type="password" required minlength="8" autocomplete="current-password" class="input" placeholder="Mínimo 8 caracteres">
-        </div>
-        <button id="auth-submit" class="btn-primary w-full" type="submit">Iniciar sesión</button>
-      </form>
-      <button id="auth-toggle" class="mt-5 w-full text-sm font-semibold text-emerald-400 hover:text-emerald-300">Crear una cuenta</button>
-      <p id="auth-help" class="mt-5 text-center text-xs leading-5 text-slate-500">Tu información se guarda de forma privada en tu cuenta.</p>
     </section>
   </main>
 
-  <main id="app-view" class="hidden pb-12">
-    <header class="border-b border-slate-800 bg-slate-950/90 backdrop-blur">
-      <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-        <div class="flex items-center gap-3">
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 font-black text-slate-950">MF</div>
-          <div><h1 class="font-bold">Finanzas MF</h1><p id="user-email" class="text-xs text-slate-400"></p></div>
+  <main id="app-view" class="hidden min-h-screen pb-24 sm:pb-10">
+    <header class="sticky top-0 z-30 border-b border-white/5 bg-[#090609]/90 backdrop-blur-xl">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+        <div class="flex min-w-0 items-center gap-3">
+          <div id="brand-icon" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 to-wine-700 font-black text-white">MF</div>
+          <div class="min-w-0"><h1 class="font-bold">Finanzas MF</h1><p id="user-email" class="truncate text-xs text-slate-400"></p></div>
         </div>
-        <button id="logout-button" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white">Salir</button>
+        <div class="flex items-center gap-2"><span id="identity-badge" class="hidden rounded-full px-3 py-1 text-xs font-bold sm:inline-flex"></span><button id="refresh-button" class="icon-button" title="Actualizar" aria-label="Actualizar datos">↻</button><button id="logout-button" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white">Salir</button></div>
       </div>
     </header>
 
-    <div class="mx-auto max-w-6xl px-5 py-7">
-      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div><p class="text-sm font-semibold text-emerald-400">RESUMEN</p><h2 class="text-3xl font-extrabold tracking-tight">Control de cuotas</h2></div>
-        <button id="refresh-button" class="btn-secondary">Actualizar datos</button>
-      </div>
+    <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      <nav class="mb-7 hidden grid-cols-4 gap-2 rounded-2xl border border-white/5 bg-[#130d12] p-2 sm:grid" aria-label="Secciones principales">
+        <button class="tab-button active" data-tab="resumen">Resumen</button>
+        <button class="tab-button" data-tab="cashea">Cashea</button>
+        <button class="tab-button" data-tab="ingresos">Ingresos</button>
+        <button class="tab-button" data-tab="egresos">Egresos</button>
+      </nav>
 
-      <section class="mb-8 grid gap-4 sm:grid-cols-3">
-        <article class="metric-card"><p>Compras activas</p><strong id="active-count">0</strong></article>
-        <article class="metric-card"><p>Saldo pendiente</p><strong id="outstanding-total">$0.00</strong></article>
-        <article class="metric-card"><p>Pagado de financiamiento</p><strong id="paid-total">$0.00</strong></article>
+      <section id="tab-resumen" class="tab-panel space-y-7">
+        <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-bold uppercase tracking-[.2em] text-wine-400">Mi billetera</p><h2 class="mt-2 text-3xl font-extrabold tracking-tight">Resumen financiero</h2><p class="mt-2 text-sm text-slate-400">Los importes de esta sección son privados y sólo pertenecen a tu cuenta.</p></div></div>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <article class="metric-card border-wine-500/20"><span class="metric-icon bg-wine-500/10 text-wine-400">◆</span><p>Balance privado</p><strong id="wallet-balance">$0.00</strong></article>
+          <article class="metric-card border-emerald-500/20"><span class="metric-icon bg-emerald-500/10 text-emerald-400">↗</span><p>Total ingresos</p><strong id="income-total" class="text-emerald-300">$0.00</strong></article>
+          <article class="metric-card border-red-500/20"><span class="metric-icon bg-red-500/10 text-red-400">↘</span><p>Total egresos</p><strong id="expense-total" class="text-red-300">$0.00</strong></article>
+          <article class="metric-card border-violet-500/20"><span class="metric-icon bg-violet-500/10 text-violet-400">◫</span><p>Mi saldo Cashea</p><strong id="cashea-outstanding">$0.00</strong></article>
+        </div>
+        <div class="grid gap-5 lg:grid-cols-2">
+          <article class="panel"><div class="mb-4 flex items-center justify-between"><div><h3 class="font-bold">Últimos movimientos privados</h3><p class="mt-1 text-xs text-slate-500">Ingresos y egresos de tu cuenta</p></div></div><div id="recent-entries" class="space-y-2"><div class="empty-state">Sin movimientos todavía.</div></div></article>
+          <article class="panel"><div class="mb-4"><h3 class="font-bold">Privacidad de tus datos</h3><p class="mt-1 text-xs text-slate-500">Qué información se comparte</p></div><div class="space-y-3 text-sm text-slate-300"><div class="privacy-row"><span class="text-emerald-400">●</span><span><strong>Ingresos y egresos:</strong> sólo los puede ver tu cuenta.</span></div><div class="privacy-row"><span class="text-wine-400">●</span><span><strong>Cashea personal:</strong> sólo lo ves tú.</span></div><div class="privacy-row"><span class="text-violet-400">●</span><span><strong>Cashea compartido:</strong> visible para Anny y Danny.</span></div></div></article>
+        </div>
       </section>
 
-      <div class="grid gap-7 lg:grid-cols-[390px_1fr]">
-        <section class="rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6">
-          <div class="mb-5"><h3 class="text-lg font-bold">Registrar compra</h3><p class="mt-1 text-sm text-slate-400">La inicial se descuenta antes de dividir las cuotas.</p></div>
-          <form id="purchase-form" class="space-y-4">
-            <div class="grid grid-cols-2 gap-3">
-              <div><label class="label" for="purchase-date">Fecha</label><input class="input" id="purchase-date" type="date" required></div>
-              <div><label class="label" for="mode">Tipo</label><select class="input" id="mode"><option value="cotidiano">Cotidiano</option><option value="principal">Principal</option></select></div>
-            </div>
-            <div><label class="label" for="product">Producto o servicio</label><input class="input" id="product" required maxlength="120" placeholder="Ej.: Teléfono"></div>
-            <div class="grid grid-cols-2 gap-3">
-              <div><label class="label" for="category">Categoría</label><input class="input" id="category" maxlength="60" placeholder="Ej.: Tecnología"></div>
-              <div><label class="label" for="store">Tienda</label><input class="input" id="store" maxlength="120" placeholder="Opcional"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div><label class="label" for="total-amount">Monto total ($)</label><input class="input" id="total-amount" type="number" min="0.01" step="0.01" required></div>
-              <div><label class="label" for="initial-amount">Inicial ($)</label><input class="input" id="initial-amount" type="number" min="0" step="0.01" value="0" required></div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div><label class="label" for="initial-payer">Pagó la inicial</label><select class="input" id="initial-payer"><option>Anny</option><option>Danny</option></select></div>
-              <div><label class="label" for="credit-line">Línea de crédito</label><select class="input" id="credit-line"><option>Anny</option><option>Danny</option></select></div>
-            </div>
-            <div><label class="label" for="split-type">División</label><select class="input" id="split-type"><option value="mitad">Mitad y mitad</option><option value="personalizado">Monto personalizado de Danny</option></select></div>
-            <div id="danny-debt-wrap" class="hidden"><label class="label" for="danny-debt">Deuda que asume Danny ($)</label><input class="input" id="danny-debt" type="number" min="0" step="0.01" value="0"></div>
-            <div><label class="label" for="installments">Cantidad de cuotas</label><select class="input" id="installments"><option value="1">1 cuota</option><option value="2">2 cuotas</option><option value="3">3 cuotas</option><option value="6">6 cuotas</option><option value="12">12 cuotas</option></select></div>
-            <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm"><div class="flex justify-between text-slate-400"><span>Financiamiento</span><strong id="preview-financed" class="text-white">$0.00</strong></div><div class="mt-1 flex justify-between text-slate-400"><span>Anny / cuota</span><strong id="preview-anny" class="text-white">$0.00</strong></div><div class="mt-1 flex justify-between text-slate-400"><span>Danny / cuota</span><strong id="preview-danny" class="text-white">$0.00</strong></div></div>
-            <div><label class="label" for="notes">Notas</label><textarea class="input min-h-20 resize-y" id="notes" maxlength="500" placeholder="Opcional"></textarea></div>
-            <button id="purchase-submit" class="btn-primary w-full" type="submit">Guardar compra</button>
-          </form>
-        </section>
+      <section id="tab-cashea" class="tab-panel hidden">
+        <div class="mb-6"><p class="text-xs font-bold uppercase tracking-[.2em] text-wine-400">Compras y cuotas</p><h2 class="mt-2 text-3xl font-extrabold">Cashea</h2></div>
+        <div class="grid gap-7 lg:grid-cols-[390px_1fr]">
+          <section class="panel h-fit"><div class="mb-5"><h3 class="text-lg font-bold">Registrar compra Cashea</h3><p class="mt-1 text-sm text-slate-400">Elige si esta compra es sólo tuya o compartida.</p></div>
+            <form id="purchase-form" class="space-y-4">
+              <div><label class="label" for="purchase-scope">Privacidad de la compra</label><select class="input" id="purchase-scope"><option value="personal">Personal · sólo yo</option><option value="shared">Compartida · Anny y Danny</option></select><p id="scope-help" class="mt-2 text-xs text-slate-500">Nadie más podrá ver esta compra.</p></div>
+              <div class="grid grid-cols-2 gap-3"><div><label class="label" for="purchase-date">Fecha</label><input class="input" id="purchase-date" type="date" required></div><div><label class="label" for="mode">Tipo</label><select class="input" id="mode"><option value="cotidiano">Cotidiano</option><option value="principal">Principal</option></select></div></div>
+              <div><label class="label" for="product">Producto o servicio</label><input class="input" id="product" required maxlength="120" placeholder="Ej.: Teléfono"></div>
+              <div class="grid grid-cols-2 gap-3"><div><label class="label" for="category">Categoría</label><input class="input" id="category" maxlength="60" placeholder="Tecnología"></div><div><label class="label" for="store">Tienda</label><input class="input" id="store" maxlength="120" placeholder="Opcional"></div></div>
+              <div class="grid grid-cols-2 gap-3"><div><label class="label" for="total-amount">Monto total ($)</label><input class="input" id="total-amount" type="number" min="0.01" step="0.01" required></div><div><label class="label" for="initial-amount">Inicial ($)</label><input class="input" id="initial-amount" type="number" min="0" step="0.01" value="0" required></div></div>
+              <div id="shared-purchase-fields" class="hidden space-y-4 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+                <p class="text-xs font-semibold text-violet-300">Datos compartidos entre Anny y Danny</p>
+                <div class="grid grid-cols-2 gap-3"><div><label class="label" for="initial-payer">Pagó la inicial</label><select class="input" id="initial-payer"><option>Anny</option><option>Danny</option></select></div><div><label class="label" for="credit-line">Línea de crédito</label><select class="input" id="credit-line"><option>Anny</option><option>Danny</option></select></div></div>
+                <div><label class="label" for="split-type">División</label><select class="input" id="split-type"><option value="mitad">Mitad y mitad</option><option value="personalizado">Monto personalizado de Danny</option></select></div>
+                <div id="danny-debt-wrap" class="hidden"><label class="label" for="danny-debt">Deuda que asume Danny ($)</label><input class="input" id="danny-debt" type="number" min="0" step="0.01" value="0"></div>
+              </div>
+              <div><label class="label" for="installments">Cantidad de cuotas</label><select class="input" id="installments"><option value="1">1 cuota</option><option value="2">2 cuotas</option><option value="3">3 cuotas</option><option value="6">6 cuotas</option><option value="12">12 cuotas</option></select></div>
+              <div class="rounded-xl border border-wine-500/20 bg-wine-500/5 p-3 text-sm"><div class="flex justify-between text-slate-400"><span>Financiamiento</span><strong id="preview-financed" class="text-white">$0.00</strong></div><div class="mt-1 flex justify-between text-red-300"><span>Anny / cuota</span><strong id="preview-anny">$0.00</strong></div><div class="mt-1 flex justify-between text-violet-300"><span>Danny / cuota</span><strong id="preview-danny">$0.00</strong></div></div>
+              <div><label class="label" for="notes">Notas</label><textarea class="input min-h-20 resize-y" id="notes" maxlength="500" placeholder="Opcional"></textarea></div>
+              <button id="purchase-submit" class="btn-primary w-full" type="submit">Guardar compra</button>
+            </form>
+          </section>
+          <section><div class="mb-4 flex items-center justify-between"><div><h3 class="text-lg font-bold">Compras activas</h3><p class="text-sm text-slate-400">Personales y compartidas que puedes ver.</p></div><span id="purchase-badge" class="count-badge">0</span></div><div id="purchase-list" class="space-y-4"><div class="empty-state">Cargando compras…</div></div><div class="mb-4 mt-8"><h3 class="text-lg font-bold">Historial de pagos Cashea</h3></div><div id="payment-list" class="space-y-3"><div class="empty-state">Cargando pagos…</div></div></section>
+        </div>
+      </section>
 
-        <section>
-          <div class="mb-4 flex items-center justify-between"><div><h3 class="text-lg font-bold">Compras activas</h3><p class="text-sm text-slate-400">Registra cada abono para actualizar el saldo.</p></div><span id="purchase-badge" class="rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-300">0</span></div>
-          <div id="purchase-list" class="space-y-4"><div class="empty-state">Cargando compras…</div></div>
-          <div class="mt-8 mb-4"><h3 class="text-lg font-bold">Historial de pagos</h3></div>
-          <div id="payment-list" class="space-y-3"><div class="empty-state">Cargando pagos…</div></div>
-        </section>
-      </div>
+      <section id="tab-ingresos" class="tab-panel hidden">
+        <div class="mb-6"><p class="text-xs font-bold uppercase tracking-[.2em] text-emerald-400">Sólo para ti</p><h2 class="mt-2 text-3xl font-extrabold">Ingresos</h2><p class="mt-2 text-sm text-slate-400">La otra cuenta no puede ver esta información.</p></div>
+        <div class="grid gap-7 lg:grid-cols-[390px_1fr]"><section class="panel h-fit border-emerald-500/10"><h3 class="mb-5 text-lg font-bold">Registrar ingreso</h3><form id="income-form" class="entry-form space-y-4" data-entry-type="ingreso"><div><label class="label" for="income-date">Fecha</label><input class="input" id="income-date" name="entry-date" type="date" required></div><div><label class="label" for="income-description">Concepto</label><input class="input" id="income-description" name="entry-description" required maxlength="160" placeholder="Ej.: Pago de salario"></div><div class="grid grid-cols-2 gap-3"><div><label class="label" for="income-amount">Monto ($)</label><input class="input" id="income-amount" name="entry-amount" type="number" min="0.01" step="0.01" required></div><div><label class="label" for="income-category">Categoría</label><input class="input" id="income-category" name="entry-category" maxlength="60" placeholder="Salario"></div></div><div><label class="label" for="income-notes">Notas</label><textarea class="input min-h-20" id="income-notes" name="entry-notes" maxlength="500" placeholder="Opcional"></textarea></div><button class="btn-income w-full" type="submit">Guardar ingreso</button></form></section><section><div class="mb-4 flex items-center justify-between"><h3 class="text-lg font-bold">Mis ingresos</h3><strong id="income-list-total" class="text-xl text-emerald-300">$0.00</strong></div><div id="income-list" class="space-y-3"><div class="empty-state">Sin ingresos registrados.</div></div></section></div>
+      </section>
+
+      <section id="tab-egresos" class="tab-panel hidden">
+        <div class="mb-6"><p class="text-xs font-bold uppercase tracking-[.2em] text-red-400">Sólo para ti</p><h2 class="mt-2 text-3xl font-extrabold">Egresos y gastos</h2><p class="mt-2 text-sm text-slate-400">Registra lo que gastas sin compartirlo con otra cuenta.</p></div>
+        <div class="grid gap-7 lg:grid-cols-[390px_1fr]"><section class="panel h-fit border-red-500/10"><h3 class="mb-5 text-lg font-bold">Registrar egreso</h3><form id="expense-form" class="entry-form space-y-4" data-entry-type="egreso"><div><label class="label" for="expense-date">Fecha</label><input class="input" id="expense-date" name="entry-date" type="date" required></div><div><label class="label" for="expense-description">Concepto</label><input class="input" id="expense-description" name="entry-description" required maxlength="160" placeholder="Ej.: Mercado semanal"></div><div class="grid grid-cols-2 gap-3"><div><label class="label" for="expense-amount">Monto ($)</label><input class="input" id="expense-amount" name="entry-amount" type="number" min="0.01" step="0.01" required></div><div><label class="label" for="expense-category">Tipo de gasto</label><input class="input" id="expense-category" name="entry-category" maxlength="60" placeholder="Alimentación"></div></div><div><label class="label" for="expense-notes">Notas</label><textarea class="input min-h-20" id="expense-notes" name="entry-notes" maxlength="500" placeholder="Opcional"></textarea></div><button class="btn-expense w-full" type="submit">Guardar egreso</button></form></section><section><div class="mb-4 flex items-center justify-between"><h3 class="text-lg font-bold">Mis egresos</h3><strong id="expense-list-total" class="text-xl text-red-300">$0.00</strong></div><div id="expense-list" class="space-y-3"><div class="empty-state">Sin egresos registrados.</div></div></section></div>
+      </section>
     </div>
+
+    <nav class="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-4 border-t border-white/10 bg-[#100a0f]/95 px-2 py-2 backdrop-blur-xl sm:hidden" aria-label="Navegación móvil"><button class="mobile-tab active" data-tab="resumen"><span>⌂</span>Resumen</button><button class="mobile-tab" data-tab="cashea"><span>◫</span>Cashea</button><button class="mobile-tab" data-tab="ingresos"><span>↗</span>Ingresos</button><button class="mobile-tab" data-tab="egresos"><span>↘</span>Egresos</button></nav>
   </main>
 
-  <div id="payment-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-    <form id="payment-form" class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-      <div class="mb-5 flex items-start justify-between gap-4"><div><h3 class="text-lg font-bold">Registrar pago</h3><p id="payment-purchase-name" class="mt-1 text-sm text-slate-400"></p></div><button id="close-payment-modal" type="button" class="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white">✕</button></div>
+  <div id="payment-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+    <form id="payment-form" class="w-full max-w-md rounded-2xl border border-wine-500/20 bg-[#160e14] p-6 shadow-2xl">
+      <div class="mb-5 flex items-start justify-between gap-4"><div><h3 class="text-lg font-bold">Registrar pago Cashea</h3><p id="payment-purchase-name" class="mt-1 text-sm text-slate-400"></p><span id="payment-scope-badge" class="mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold"></span></div><button id="close-payment-modal" type="button" class="icon-button" aria-label="Cerrar">✕</button></div>
       <input id="payment-purchase-id" type="hidden">
       <div class="space-y-4"><div><label class="label" for="payment-payer">¿Quién pagó?</label><select class="input" id="payment-payer"><option>Anny</option><option>Danny</option></select></div><div><label class="label" for="payment-amount">Monto abonado ($)</label><input class="input" id="payment-amount" type="number" min="0.01" step="0.01" required></div><div><label class="label" for="payment-reference">Referencia</label><input class="input" id="payment-reference" maxlength="120" placeholder="Opcional"></div><div><label class="label" for="payment-date">Fecha del pago</label><input class="input" id="payment-date" type="date" required></div><div><label class="label" for="receipt-url">Enlace del comprobante</label><input class="input" id="receipt-url" type="url" maxlength="500" placeholder="Opcional"></div></div>
       <button id="payment-submit" class="btn-primary mt-6 w-full" type="submit">Guardar pago</button>
@@ -114,7 +123,7 @@
   </div>
 
   <style>
-    .input { width: 100%; border-radius: .75rem; border: 1px solid rgb(51 65 85); background: rgb(15 23 42); padding: .65rem .75rem; font-size: .875rem; color: white; outline: none; } .input:focus { border-color: rgb(52 211 153); box-shadow: 0 0 0 3px rgb(16 185 129 / .12); } .label { margin-bottom: .35rem; display: block; font-size: .75rem; font-weight: 600; color: rgb(203 213 225); } .btn-primary { border-radius: .75rem; background: linear-gradient(135deg, rgb(52 211 153), rgb(6 182 212)); padding: .7rem 1rem; font-size: .875rem; font-weight: 800; color: rgb(15 23 42); transition: opacity .15s; } .btn-primary:hover { opacity: .9; } .btn-primary:disabled, .btn-secondary:disabled { cursor: not-allowed; opacity: .55; } .btn-secondary { border: 1px solid rgb(51 65 85); border-radius: .75rem; padding: .6rem .85rem; font-size: .875rem; font-weight: 600; color: rgb(203 213 225); } .btn-secondary:hover { background: rgb(30 41 59); color: white; } .metric-card { border: 1px solid rgb(30 41 59); border-radius: 1rem; background: rgb(15 23 42); padding: 1.1rem; } .metric-card p { font-size: .8rem; color: rgb(148 163 184); } .metric-card strong { display: block; margin-top: .4rem; font-size: 1.55rem; color: white; } .empty-state { border: 1px dashed rgb(51 65 85); border-radius: 1rem; padding: 2rem; text-align: center; color: rgb(148 163 184); font-size: .875rem; }
+    .input{width:100%;border-radius:.75rem;border:1px solid rgb(51 39 48);background:#0d090c;padding:.68rem .78rem;font-size:.875rem;color:#fff;outline:none}.input:focus{border-color:#b94062;box-shadow:0 0 0 3px rgb(152 43 75/.15)}.label{margin-bottom:.4rem;display:block;font-size:.75rem;font-weight:650;color:#d5cbd1}.panel{border:1px solid rgb(255 255 255/.06);border-radius:1rem;background:#130d12;padding:1.25rem}.btn-primary,.btn-income,.btn-expense{border-radius:.75rem;padding:.75rem 1rem;font-size:.875rem;font-weight:800;transition:.15s}.btn-primary{background:linear-gradient(135deg,#dc2626,#7c1f3b);color:#fff}.btn-income{background:#059669;color:#fff}.btn-expense{background:#b91c1c;color:#fff}.btn-primary:hover,.btn-income:hover,.btn-expense:hover{filter:brightness(1.1)}button:disabled{cursor:not-allowed;opacity:.55}.icon-button{display:flex;height:2.3rem;width:2.3rem;align-items:center;justify-content:center;border-radius:.65rem;color:#94a3b8}.icon-button:hover{background:rgb(255 255 255/.06);color:#fff}.tab-button{border-radius:.75rem;padding:.65rem;font-size:.875rem;font-weight:700;color:#94a3b8}.tab-button:hover{background:rgb(255 255 255/.04);color:#fff}.tab-button.active{background:linear-gradient(135deg,#991b1b,#62172f);color:#fff}.mobile-tab{display:flex;flex-direction:column;align-items:center;gap:.15rem;border-radius:.65rem;padding:.35rem;font-size:.65rem;font-weight:650;color:#94a3b8}.mobile-tab span{font-size:1.1rem}.mobile-tab.active{background:rgb(124 31 59/.35);color:#fda4af}.metric-card{position:relative;overflow:hidden;border-width:1px;border-radius:1rem;background:#130d12;padding:1.15rem}.metric-card p{margin-top:.85rem;font-size:.78rem;color:#94a3b8}.metric-card strong{display:block;margin-top:.35rem;font-size:1.5rem}.metric-icon{display:flex;height:2rem;width:2rem;align-items:center;justify-content:center;border-radius:.65rem}.empty-state{border:1px dashed rgb(71 57 67);border-radius:1rem;padding:1.75rem;text-align:center;color:#77707a;font-size:.875rem}.count-badge{border-radius:999px;background:#241820;padding:.25rem .75rem;font-size:.8rem;color:#c9b8c3}.privacy-row{display:flex;gap:.7rem;border-radius:.75rem;background:#0d090c;padding:.8rem}.entry-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;border:1px solid rgb(255 255 255/.06);border-radius:.85rem;background:#130d12;padding:1rem}
   </style>
   <script src="app.js"></script>
 </body>
