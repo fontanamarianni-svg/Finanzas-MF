@@ -12,7 +12,7 @@ Billetera web privada publicada con **GitHub Pages** y respaldada por **Supabase
 - Las compras que ya existían antes de esta actualización quedan privadas automáticamente.
 - La seguridad se aplica en PostgreSQL mediante Row Level Security (RLS), no sólo ocultando elementos de la pantalla.
 
-> Si el correo de Danny no es correcto, cámbialo tanto en `config.js` como en la función `is_finanzas_pair` de `supabase-setup.sql` **antes** de usar cuentas compartidas.
+> Si el correo de Danny no es correcto, cámbialo tanto en `config.js` como en la función `finanzas_member_name` de `supabase-setup.sql` **antes** de usar cuentas compartidas.
 
 ## Paso obligatorio: actualizar Supabase
 
@@ -61,6 +61,12 @@ git add index.html app.js config.js supabase-setup.sql README.md
 git commit -m "Agregar billetera privada y Cashea compartido"
 git push
 ```
+
+## Corregir registros
+
+- En **Ingresos** y **Egresos**, pulsa **Editar** en un movimiento para corregir fecha, concepto, monto, categoría o notas. Puedes cancelar antes de guardar.
+- En **Cashea**, el creador de una compra puede pulsar **Editar compra**. Si aún no tiene abonos, puede corregir todos sus datos excepto si es personal o compartida. Si ya tiene abonos, quedan protegidos el monto, la inicial, el reparto y las cuotas; aún puedes corregir fecha, producto, categoría, tienda, tipo y notas.
+- En el historial de pagos, sólo quien registró el pago verá **Editar**. Al cambiar monto o pagador, Supabase recalcula automáticamente los saldos de Anny y Danny y rechaza cualquier cambio que exceda su deuda.
 
 ## Cómo probar
 

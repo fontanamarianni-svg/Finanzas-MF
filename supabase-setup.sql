@@ -286,4 +286,183 @@ revoke all on function public.record_payment(uuid, text, numeric, text, date, te
 revoke all on function public.record_payment(uuid, text, numeric, text, date, text) from anon;
 grant execute on function public.record_payment(uuid, text, numeric, text, date, text) to authenticated;
 
+-- Corrige una compra Cashea. Sólo el creador puede modificarla.
+-- Cuando existen pagos, sus importes, reparto y cuotas quedan bloqueados.
+create or replace function public.update_purchase(
+  p_purchase_id uuid,
+  p_purchase_date date,
+  p_product text,
+  p_category text,
+  p_store_name text,
+  p_mode text,
+  p_total_amount numeric,
+  p_initial_amount numeric,
+  p_initial_paid_by text,
+  p_credit_line text,
+  p_split_type text,
+  p_anny_debt numeric,
+  p_danny_debt numeric,
+  p_installments smallint,
+  p_notes text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_purchase public.purchases%rowtype;
+  v_financed numeric(12,2);
+  v_has_payments boolean;
+begin
+  if public.finanzas_member_name(auth.uid()) is null then
+    raise exception 'Tu cuenta no está autorizada o el correo no está confirmado.';
+  end if;
+  if p_purchase_date is null or char_length(trim(coalesce(p_product, ''))) not between 1 and 120 then
+    raise exception 'La fecha y el producto son obligatorios.';
+  end if;
+  if char_length(coalesce(p_category, '')) > 60 or char_length(coalesce(p_store_name, '')) > 120 or char_length(coalesce(p_notes, '')) > 500 then
+    raise exception 'Uno de los textos supera el límite permitido.';
+  end if;
+  if p_mode not in ('cotidiano', 'principal') or p_initial_paid_by not in ('Anny', 'Danny') or p_credit_line not in ('Anny', 'Danny') or p_split_type not in ('mitad', 'personalizado') or p_installments not in (1, 2, 3, 6, 12) then
+    raise exception 'Los datos de la compra no son válidos.';
+  end if;
+  if p_total_amount is null or p_initial_amount is null or round(p_total_amount, 2) <= round(p_initial_amount, 2) or p_initial_amount < 0 then
+    raise exception 'La inicial debe ser menor que el total de la compra.';
+  end if;
+  v_financed := round(p_total_amount - p_initial_amount, 2);
+  if p_anny_debt is null or p_danny_debt is null or p_anny_debt < 0 or p_danny_debt < 0 or round(p_anny_debt + p_danny_debt, 2) <> v_financed then
+    raise exception 'La división de deuda no coincide con el financiamiento.';
+  end if;
+
+  select * into v_purchase
+  from public.purchases
+  where id = p_purchase_id and user_id = auth.uid()
+  for update;
+  if not found then
+    raise exception 'No se encontró la compra o no puedes editarla.';
+  end if;
+
+  v_has_payments := exists (
+    select 1 from public.payments
+    where purchase_id = v_purchase.id
+  );
+  if v_has_payments and (
+    round(p_total_amount, 2) is distinct from round(v_purchase.total_amount, 2)
+    or round(p_initial_amount, 2) is distinct from round(v_purchase.initial_amount, 2)
+    or p_initial_paid_by is distinct from v_purchase.initial_paid_by
+    or p_credit_line is distinct from v_purchase.credit_line
+    or p_split_type is distinct from v_purchase.split_type
+    or round(p_anny_debt, 2) is distinct from round(v_purchase.anny_debt, 2)
+    or round(p_danny_debt, 2) is distinct from round(v_purchase.danny_debt, 2)
+    or p_installments is distinct from v_purchase.installments
+  ) then
+    raise exception 'Esta compra tiene pagos. Sólo puedes editar fecha, producto, categoría, tienda, tipo y notas.';
+  end if;
+
+  update public.purchases
+  set purchase_date = p_purchase_date,
+      product = trim(p_product),
+      category = trim(coalesce(p_category, '')),
+      store_name = trim(coalesce(p_store_name, '')),
+      mode = p_mode,
+      notes = trim(coalesce(p_notes, '')),
+      total_amount = case when v_has_payments then total_amount else round(p_total_amount, 2) end,
+      initial_amount = case when v_has_payments then initial_amount else round(p_initial_amount, 2) end,
+      initial_paid_by = case when v_has_payments then initial_paid_by else p_initial_paid_by end,
+      credit_line = case when v_has_payments then credit_line else p_credit_line end,
+      split_type = case when v_has_payments then split_type else p_split_type end,
+      anny_debt = case when v_has_payments then anny_debt else round(p_anny_debt, 2) end,
+      danny_debt = case when v_has_payments then danny_debt else round(p_danny_debt, 2) end,
+      installments = case when v_has_payments then installments else p_installments end
+  where id = p_purchase_id;
+
+  return jsonb_build_object('success', true, 'has_payments', v_has_payments);
+end;
+$$;
+
+revoke all on function public.update_purchase(uuid, date, text, text, text, text, numeric, numeric, text, text, text, numeric, numeric, smallint, text) from public;
+revoke all on function public.update_purchase(uuid, date, text, text, text, text, numeric, numeric, text, text, text, numeric, numeric, smallint, text) from anon;
+grant execute on function public.update_purchase(uuid, date, text, text, text, text, numeric, numeric, text, text, text, numeric, numeric, smallint, text) to authenticated;
+
+-- Corrige un pago registrado por el usuario actual y recalcula ambos saldos de forma atómica.
+create or replace function public.update_payment(
+  p_payment_id uuid,
+  p_payer text,
+  p_amount numeric,
+  p_reference text default null,
+  p_paid_at date default current_date,
+  p_receipt_url text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_payment public.payments%rowtype;
+  v_purchase public.purchases%rowtype;
+  v_anny_paid numeric(12,2);
+  v_danny_paid numeric(12,2);
+  v_total_paid numeric(12,2);
+begin
+  if public.finanzas_member_name(auth.uid()) is null then
+    raise exception 'Tu cuenta no está autorizada o el correo no está confirmado.';
+  end if;
+  if p_payer not in ('Anny', 'Danny') or p_amount is null or round(p_amount, 2) <= 0 then
+    raise exception 'Los datos del pago no son válidos.';
+  end if;
+  if p_paid_at is null or char_length(coalesce(p_reference, '')) > 120 or char_length(coalesce(p_receipt_url, '')) > 500 then
+    raise exception 'La fecha, referencia o enlace no son válidos.';
+  end if;
+
+  select * into v_payment
+  from public.payments
+  where id = p_payment_id and user_id = auth.uid()
+  for update;
+  if not found then
+    raise exception 'Sólo puedes editar pagos que registraste tú.';
+  end if;
+
+  select * into v_purchase
+  from public.purchases
+  where id = v_payment.purchase_id
+  for update;
+  if not found then
+    raise exception 'No se encontró la compra relacionada.';
+  end if;
+  if not v_purchase.is_shared and p_payer <> public.finanzas_member_name(v_purchase.user_id) then
+    raise exception 'Una compra personal sólo puede abonarse a nombre de su dueño.';
+  end if;
+
+  v_anny_paid := round(v_purchase.anny_paid - case when v_payment.payer = 'Anny' then v_payment.amount else 0 end + case when p_payer = 'Anny' then p_amount else 0 end, 2);
+  v_danny_paid := round(v_purchase.danny_paid - case when v_payment.payer = 'Danny' then v_payment.amount else 0 end + case when p_payer = 'Danny' then p_amount else 0 end, 2);
+  if v_anny_paid < 0 or v_danny_paid < 0 or v_anny_paid > v_purchase.anny_debt or v_danny_paid > v_purchase.danny_debt then
+    raise exception 'El cambio supera el saldo asignado a Anny o Danny.';
+  end if;
+  v_total_paid := round(v_anny_paid + v_danny_paid, 2);
+
+  update public.payments
+  set payer = p_payer,
+      amount = round(p_amount, 2),
+      reference = nullif(trim(p_reference), ''),
+      paid_at = p_paid_at,
+      receipt_url = nullif(trim(p_receipt_url), '')
+  where id = p_payment_id;
+
+  update public.purchases
+  set anny_paid = v_anny_paid,
+      danny_paid = v_danny_paid,
+      total_paid = v_total_paid,
+      status = case when v_total_paid >= total_amount - initial_amount then 'saldada' else 'activa' end
+  where id = v_purchase.id;
+
+  return jsonb_build_object('success', true, 'total_paid', v_total_paid);
+end;
+$$;
+
+revoke all on function public.update_payment(uuid, text, numeric, text, date, text) from public;
+revoke all on function public.update_payment(uuid, text, numeric, text, date, text) from anon;
+grant execute on function public.update_payment(uuid, text, numeric, text, date, text) to authenticated;
+
 commit;

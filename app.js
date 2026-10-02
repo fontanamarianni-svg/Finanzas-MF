@@ -9,7 +9,10 @@
     anny: (config?.accounts?.anny || 'fontanamarianni@gmail.com').toLowerCase(),
     danny: (config?.accounts?.danny || 'josedgonzalezm127@gmail.com').toLowerCase()
   };
-  const state = { db: null, user: null, purchases: [], payments: [], entries: [], creatingAccount: false, sessionVersion: 0 };
+  const state = {
+    db: null, user: null, purchases: [], payments: [], entries: [], creatingAccount: false,
+    sessionVersion: 0, editingPurchaseId: null, editingPaymentId: null
+  };
 
   function today() {
     const date = new Date();
@@ -56,47 +59,9 @@
     $('#app-view').classList.toggle('hidden', !isLoggedIn);
   }
 
-  function closePaymentModal() {
-    $('#payment-modal').classList.add('hidden');
-    $('#payment-modal').classList.remove('flex');
-  }
-
-  function clearAccountData() {
-    state.purchases = [];
-    state.payments = [];
-    state.entries = [];
-    ['#wallet-balance', '#income-total', '#expense-total', '#cashea-outstanding', '#income-list-total', '#expense-list-total'].forEach((selector) => { $(selector).textContent = '$0.00'; });
-    $('#purchase-badge').textContent = '0';
-    $('#recent-entries').innerHTML = '<div class="empty-state">Sin movimientos todavía.</div>';
-    $('#purchase-list').innerHTML = '<div class="empty-state">Cargando compras…</div>';
-    $('#payment-list').innerHTML = '<div class="empty-state">Cargando pagos…</div>';
-    $('#income-list').innerHTML = '<div class="empty-state">Sin ingresos registrados.</div>';
-    $('#expense-list').innerHTML = '<div class="empty-state">Sin egresos registrados.</div>';
-    closePaymentModal();
-  }
-
-  function resetForms() {
-    $('#auth-form').reset();
-    $('#purchase-form').reset();
-    $('#income-form').reset();
-    $('#expense-form').reset();
-    $('#payment-form').reset();
-    setFormDates();
-    togglePurchaseScope();
-  }
-
-  function applyIdentityTheme() {
-    const identity = currentIdentity();
-    $('#user-email').textContent = identity.email;
-    $('#identity-badge').textContent = identity.name;
-    $('#identity-badge').className = `hidden rounded-full px-3 py-1 text-xs font-bold sm:inline-flex ${identity.theme === 'danny' ? 'bg-violet-500/15 text-violet-300' : 'bg-wine-500/15 text-red-300'}`;
-    $('#brand-icon').className = `flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black text-white ${identity.theme === 'danny' ? 'bg-gradient-to-br from-violet-500 to-purple-800' : 'bg-gradient-to-br from-red-600 to-wine-700'}`;
-  }
-
   function switchTab(tabName) {
     const activePanel = document.getElementById(`tab-${tabName}`);
     if (!activePanel) return;
-
     $$('.tab-panel').forEach((panel) => {
       const isActive = panel === activePanel;
       panel.hidden = !isActive;
@@ -106,7 +71,6 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // La navegación no depende de Supabase: funciona incluso si falla la carga de datos.
   function bindNavigation() {
     document.addEventListener('click', (event) => {
       const tabButton = event.target.closest('button[data-tab]');
@@ -116,7 +80,8 @@
     });
   }
 
-  bindNavigation();
+  const remaining = (purchase) => Math.max(0, Number(purchase.total_amount) - Number(purchase.initial_amount) - Number(purchase.total_paid));
+  const personPending = (purchase, person) => Math.max(0, Number(person === 'Danny' ? purchase.danny_debt : purchase.anny_debt) - Number(person === 'Danny' ? purchase.danny_paid : purchase.anny_paid));
 
   function getPurchaseValues() {
     const totalCents = Math.round(Number($('#total-amount').value || 0) * 100);
@@ -127,7 +92,6 @@
     let annyCents = 0;
     let dannyCents = 0;
     let splitType = 'personalizado';
-
     if (!isShared) {
       if (currentIdentity().person === 'Danny') dannyCents = financedCents;
       else annyCents = financedCents;
@@ -162,8 +126,9 @@
     updatePurchasePreview();
   }
 
-  const remaining = (purchase) => Math.max(0, Number(purchase.total_amount) - Number(purchase.initial_amount) - Number(purchase.total_paid));
-  const personPending = (purchase, person) => Math.max(0, Number(person === 'Danny' ? purchase.danny_debt : purchase.anny_debt) - Number(person === 'Danny' ? purchase.danny_paid : purchase.anny_paid));
+  function editButton(label, dataset, classes = 'text-wine-300 hover:text-red-200') {
+    return `<button type="button" ${dataset} class="mt-1 text-xs font-semibold ${classes}">${label}</button>`;
+  }
 
   async function loadData(version = state.sessionVersion) {
     if (!state.user) return;
@@ -198,7 +163,8 @@
 
   function entryMarkup(entry, compact = false) {
     const isIncome = entry.entry_type === 'ingreso';
-    return `<article class="entry-row"><div class="min-w-0"><div class="flex items-center gap-2"><span class="${isIncome ? 'text-emerald-400' : 'text-red-400'}">${isIncome ? '↗' : '↘'}</span><p class="truncate font-semibold">${escapeHtml(entry.description)}</p></div><p class="mt-1 text-xs text-slate-500">${escapeHtml(entry.category || 'Sin categoría')} · ${formatDate(entry.entry_date)}</p></div><div class="shrink-0 text-right"><strong class="${isIncome ? 'text-emerald-300' : 'text-red-300'}">${isIncome ? '+' : '−'}${formatMoney(entry.amount)}</strong>${compact ? '' : `<button data-delete-entry="${entry.id}" class="mt-1 block w-full text-xs text-slate-600 hover:text-red-300">Eliminar</button>`}</div></article>`;
+    const actions = compact ? '' : `<div class="mt-1 flex justify-end gap-3">${editButton('Editar', `data-edit-entry="${entry.id}"`, isIncome ? 'text-emerald-300 hover:text-emerald-100' : 'text-red-300 hover:text-red-100')}${editButton('Eliminar', `data-delete-entry="${entry.id}"`, 'text-slate-500 hover:text-red-300')}</div>`;
+    return `<article class="entry-row"><div class="min-w-0"><div class="flex items-center gap-2"><span class="${isIncome ? 'text-emerald-400' : 'text-red-400'}">${isIncome ? '↗' : '↘'}</span><p class="truncate font-semibold">${escapeHtml(entry.description)}</p></div><p class="mt-1 text-xs text-slate-500">${escapeHtml(entry.category || 'Sin categoría')} · ${formatDate(entry.entry_date)}</p></div><div class="shrink-0 text-right"><strong class="${isIncome ? 'text-emerald-300' : 'text-red-300'}">${isIncome ? '+' : '−'}${formatMoney(entry.amount)}</strong>${actions}</div></article>`;
   }
 
   function renderDashboard() {
@@ -235,15 +201,61 @@
       const progress = financed > 0 ? Math.min(100, Math.round((Number(purchase.total_paid) / financed) * 100)) : 100;
       const shared = Boolean(purchase.is_shared);
       const ownerLabel = purchase.user_id === state.user.id ? 'Creada por mí' : `Compartida por ${currentIdentity().person === 'Anny' ? 'Danny' : 'Anny'}`;
-      return `<article class="overflow-hidden rounded-2xl border ${shared ? 'border-violet-500/20' : 'border-wine-500/20'} bg-[#130d12] shadow-xl shadow-black/10"><div class="h-1 ${shared ? 'bg-gradient-to-r from-red-600 to-violet-600' : 'bg-gradient-to-r from-red-600 to-wine-700'}"></div><div class="p-5"><div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div class="mb-2 flex flex-wrap gap-2"><span class="rounded-full bg-white/5 px-2.5 py-1 text-xs text-slate-300">${escapeHtml(purchase.category || 'Sin categoría')}</span><span class="rounded-full px-2.5 py-1 text-xs font-bold ${shared ? 'bg-violet-500/10 text-violet-300' : 'bg-wine-500/10 text-red-300'}">${shared ? 'Anny + Danny' : 'Personal'}</span></div><h4 class="text-lg font-bold">${escapeHtml(purchase.product)}</h4><p class="mt-1 text-xs text-slate-500">${ownerLabel} · ${formatDate(purchase.purchase_date)}</p></div><div class="text-left sm:text-right"><p class="text-xs text-slate-500">Saldo total</p><strong class="text-xl ${shared ? 'text-violet-300' : 'text-red-300'}">${formatMoney(remaining(purchase))}</strong></div></div><div class="mt-5"><div class="mb-2 flex justify-between text-xs text-slate-500"><span>${formatMoney(purchase.total_paid)} pagado de ${formatMoney(financed)}</span><span>${progress}%</span></div><div class="h-2 overflow-hidden rounded-full bg-black/40"><div class="h-full rounded-full ${shared ? 'bg-gradient-to-r from-red-600 to-violet-600' : 'bg-gradient-to-r from-red-600 to-wine-500'}" style="width:${progress}%"></div></div></div><div class="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-black/20 p-3 text-sm"><div><span class="block text-xs text-red-400">Anny pendiente</span><strong>${formatMoney(personPending(purchase, 'Anny'))}</strong><span class="block text-[10px] text-slate-600">${formatMoney(Number(purchase.anny_debt) / Number(purchase.installments))} / cuota</span></div><div><span class="block text-xs text-violet-400">Danny pendiente</span><strong>${formatMoney(personPending(purchase, 'Danny'))}</strong><span class="block text-[10px] text-slate-600">${formatMoney(Number(purchase.danny_debt) / Number(purchase.installments))} / cuota</span></div></div><button data-pay-purchase="${purchase.id}" class="btn-primary mt-4 w-full">Registrar abono</button></div></article>`;
+      const edit = purchase.user_id === state.user.id ? editButton('Editar compra', `data-edit-purchase="${purchase.id}"`) : '';
+      return `<article class="overflow-hidden rounded-2xl border ${shared ? 'border-violet-500/20' : 'border-wine-500/20'} bg-[#130d12] shadow-xl shadow-black/10"><div class="h-1 ${shared ? 'bg-gradient-to-r from-red-600 to-violet-600' : 'bg-gradient-to-r from-red-600 to-wine-700'}"></div><div class="p-5"><div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div class="mb-2 flex flex-wrap gap-2"><span class="rounded-full bg-white/5 px-2.5 py-1 text-xs text-slate-300">${escapeHtml(purchase.category || 'Sin categoría')}</span><span class="rounded-full px-2.5 py-1 text-xs font-bold ${shared ? 'bg-violet-500/10 text-violet-300' : 'bg-wine-500/10 text-red-300'}">${shared ? 'Anny + Danny' : 'Personal'}</span></div><h4 class="text-lg font-bold">${escapeHtml(purchase.product)}</h4><p class="mt-1 text-xs text-slate-500">${ownerLabel} · ${formatDate(purchase.purchase_date)}</p></div><div class="text-left sm:text-right"><p class="text-xs text-slate-500">Saldo total</p><strong class="text-xl ${shared ? 'text-violet-300' : 'text-red-300'}">${formatMoney(remaining(purchase))}</strong></div></div><div class="mt-5"><div class="mb-2 flex justify-between text-xs text-slate-500"><span>${formatMoney(purchase.total_paid)} pagado de ${formatMoney(financed)}</span><span>${progress}%</span></div><div class="h-2 overflow-hidden rounded-full bg-black/40"><div class="h-full rounded-full ${shared ? 'bg-gradient-to-r from-red-600 to-violet-600' : 'bg-gradient-to-r from-red-600 to-wine-500'}" style="width:${progress}%"></div></div></div><div class="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-black/20 p-3 text-sm"><div><span class="block text-xs text-red-400">Anny pendiente</span><strong>${formatMoney(personPending(purchase, 'Anny'))}</strong><span class="block text-[10px] text-slate-600">${formatMoney(Number(purchase.anny_debt) / Number(purchase.installments))} / cuota</span></div><div><span class="block text-xs text-violet-400">Danny pendiente</span><strong>${formatMoney(personPending(purchase, 'Danny'))}</strong><span class="block text-[10px] text-slate-600">${formatMoney(Number(purchase.danny_debt) / Number(purchase.installments))} / cuota</span></div></div><div class="mt-4 flex gap-3"><button data-pay-purchase="${purchase.id}" class="btn-primary flex-1">Registrar abono</button>${edit}</div></div></article>`;
     }).join('');
   }
 
   function renderPayments() {
     $('#payment-list').innerHTML = state.payments.length ? state.payments.map((payment) => {
       const shared = Boolean(payment.purchases?.is_shared);
-      return `<article class="entry-row"><div class="min-w-0"><div class="flex items-center gap-2"><span class="${payment.payer === 'Danny' ? 'text-violet-400' : 'text-red-400'}">●</span><p class="truncate font-semibold">${escapeHtml(payment.purchases?.product || 'Compra Cashea')}</p></div><p class="mt-1 text-xs text-slate-500">${escapeHtml(payment.payer)} · ${formatDate(payment.paid_at)}${payment.reference ? ` · Ref. ${escapeHtml(payment.reference)}` : ''} · ${shared ? 'Compartido' : 'Personal'}</p></div><strong class="shrink-0 ${payment.payer === 'Danny' ? 'text-violet-300' : 'text-red-300'}">${formatMoney(payment.amount)}</strong></article>`;
+      const edit = payment.user_id === state.user.id ? editButton('Editar', `data-edit-payment="${payment.id}"`) : '';
+      return `<article class="entry-row"><div class="min-w-0"><div class="flex items-center gap-2"><span class="${payment.payer === 'Danny' ? 'text-violet-400' : 'text-red-400'}">●</span><p class="truncate font-semibold">${escapeHtml(payment.purchases?.product || 'Compra Cashea')}</p></div><p class="mt-1 text-xs text-slate-500">${escapeHtml(payment.payer)} · ${formatDate(payment.paid_at)}${payment.reference ? ` · Ref. ${escapeHtml(payment.reference)}` : ''} · ${shared ? 'Compartido' : 'Personal'}</p></div><div class="shrink-0 text-right"><strong class="${payment.payer === 'Danny' ? 'text-violet-300' : 'text-red-300'}">${formatMoney(payment.amount)}</strong>${edit}</div></article>`;
     }).join('') : '<div class="empty-state">Aún no hay pagos Cashea.</div>';
+  }
+
+  function ensureCancelButton(form, id, label, handler) {
+    let cancel = $(`#${id}`);
+    if (!cancel) {
+      cancel = document.createElement('button');
+      cancel.id = id;
+      cancel.type = 'button';
+      cancel.className = 'mt-3 w-full rounded-xl border border-slate-700 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5';
+      cancel.addEventListener('click', handler);
+      form.append(cancel);
+    }
+    cancel.textContent = label;
+    return cancel;
+  }
+
+  function setEntryMode(form, entry = null) {
+    const isEditing = Boolean(entry);
+    form.dataset.editId = entry?.id || '';
+    const submit = $('button[type="submit"]', form);
+    submit.textContent = isEditing ? 'Guardar cambios' : (form.dataset.entryType === 'ingreso' ? 'Guardar ingreso' : 'Guardar egreso');
+    submit.dataset.originalText = submit.textContent;
+    const cancel = ensureCancelButton(form, `${form.id}-cancel`, 'Cancelar edición', () => endEntryEdit(form));
+    cancel.classList.toggle('hidden', !isEditing);
+  }
+
+  function startEntryEdit(entryId) {
+    const entry = state.entries.find((item) => item.id === entryId);
+    if (!entry) return;
+    const form = entry.entry_type === 'ingreso' ? $('#income-form') : $('#expense-form');
+    $('[name="entry-date"]', form).value = entry.entry_date;
+    $('[name="entry-description"]', form).value = entry.description;
+    $('[name="entry-amount"]', form).value = Number(entry.amount).toFixed(2);
+    $('[name="entry-category"]', form).value = entry.category || '';
+    $('[name="entry-notes"]', form).value = entry.notes || '';
+    setEntryMode(form, entry);
+    switchTab(entry.entry_type === 'ingreso' ? 'ingresos' : 'egresos');
+    notify('Edita el movimiento y presiona Guardar cambios.');
+  }
+
+  function endEntryEdit(form) {
+    form.reset();
+    $('[name="entry-date"]', form).value = today();
+    setEntryMode(form);
   }
 
   async function submitAuth(event) {
@@ -263,6 +275,86 @@
     notify(state.creatingAccount ? 'Cuenta creada correctamente.' : 'Sesión iniciada.');
   }
 
+  function purchasePayload(values) {
+    const person = currentIdentity().person;
+    return {
+      p_purchase_date: $('#purchase-date').value,
+      p_product: $('#product').value.trim(),
+      p_category: $('#category').value.trim(),
+      p_store_name: $('#store').value.trim(),
+      p_mode: $('#mode').value,
+      p_total_amount: values.totalAmount,
+      p_initial_amount: values.initialAmount,
+      p_initial_paid_by: values.isShared ? $('#initial-payer').value : person,
+      p_credit_line: values.isShared ? $('#credit-line').value : person,
+      p_split_type: values.splitType,
+      p_anny_debt: values.annyDebt,
+      p_danny_debt: values.dannyDebt,
+      p_installments: values.installments,
+      p_notes: $('#notes').value.trim()
+    };
+  }
+
+  function setPurchaseFinancialDisabled(disabled) {
+    ['#total-amount', '#initial-amount', '#initial-payer', '#credit-line', '#split-type', '#danny-debt', '#installments'].forEach((selector) => { $(selector).disabled = disabled; });
+  }
+
+  function purchaseEditNotice(text = '') {
+    let notice = $('#purchase-edit-notice');
+    if (!notice) {
+      notice = document.createElement('p');
+      notice.id = 'purchase-edit-notice';
+      notice.className = 'mb-3 rounded-xl border border-wine-500/30 bg-wine-500/10 p-3 text-xs text-wine-300';
+      $('#purchase-form').prepend(notice);
+    }
+    notice.textContent = text;
+    notice.classList.toggle('hidden', !text);
+  }
+
+  function endPurchaseEdit() {
+    state.editingPurchaseId = null;
+    $('#purchase-form').reset();
+    $('#purchase-scope').disabled = false;
+    setPurchaseFinancialDisabled(false);
+    $('#purchase-submit').textContent = 'Guardar compra';
+    $('#purchase-submit').dataset.originalText = 'Guardar compra';
+    purchaseEditNotice('');
+    const cancel = $('#purchase-edit-cancel');
+    if (cancel) cancel.classList.add('hidden');
+    setFormDates();
+    togglePurchaseScope();
+  }
+
+  function startPurchaseEdit(purchaseId) {
+    const purchase = state.purchases.find((item) => item.id === purchaseId);
+    if (!purchase || purchase.user_id !== state.user.id) return notify('Sólo puedes editar compras que registraste tú.', 'error');
+    state.editingPurchaseId = purchase.id;
+    $('#purchase-date').value = purchase.purchase_date;
+    $('#purchase-scope').value = purchase.is_shared ? 'shared' : 'personal';
+    $('#purchase-scope').disabled = true;
+    $('#mode').value = purchase.mode;
+    $('#product').value = purchase.product;
+    $('#category').value = purchase.category || '';
+    $('#store').value = purchase.store_name || '';
+    $('#total-amount').value = Number(purchase.total_amount).toFixed(2);
+    $('#initial-amount').value = Number(purchase.initial_amount).toFixed(2);
+    $('#initial-payer').value = purchase.initial_paid_by;
+    $('#credit-line').value = purchase.credit_line;
+    $('#split-type').value = purchase.split_type;
+    $('#danny-debt').value = Number(purchase.danny_debt).toFixed(2);
+    $('#installments').value = String(purchase.installments);
+    $('#notes').value = purchase.notes || '';
+    togglePurchaseScope();
+    const hasPayments = Number(purchase.total_paid) > 0;
+    setPurchaseFinancialDisabled(hasPayments);
+    $('#purchase-submit').textContent = 'Guardar cambios';
+    $('#purchase-submit').dataset.originalText = 'Guardar cambios';
+    purchaseEditNotice(hasPayments ? 'Esta compra ya tiene abonos: puedes corregir fecha, producto, categoría, tienda, tipo y notas. Los importes y cuotas están protegidos.' : 'Puedes corregir todos los datos de esta compra. La privacidad personal/compartida no se puede cambiar.');
+    const cancel = ensureCancelButton($('#purchase-form'), 'purchase-edit-cancel', 'Cancelar edición', endPurchaseEdit);
+    cancel.classList.remove('hidden');
+    switchTab('cashea');
+  }
+
   async function submitPurchase(event) {
     event.preventDefault();
     const values = getPurchaseValues();
@@ -273,17 +365,22 @@
     if (!person) return notify('Tu cuenta no está autorizada.', 'error');
     const button = $('#purchase-submit');
     setButton(button, true);
-    const { error } = await state.db.from('purchases').insert({
-      user_id: state.user.id, purchase_date: $('#purchase-date').value, product: $('#product').value.trim(), category: $('#category').value.trim(), store_name: $('#store').value.trim(), mode: $('#mode').value,
-      credit_line: values.isShared ? $('#credit-line').value : person, total_amount: values.totalAmount.toFixed(2), initial_amount: values.initialAmount.toFixed(2), initial_paid_by: values.isShared ? $('#initial-payer').value : person,
-      split_type: values.splitType, anny_debt: values.annyDebt.toFixed(2), danny_debt: values.dannyDebt.toFixed(2), installments: values.installments, notes: $('#notes').value.trim(), is_shared: values.isShared
-    });
+    const payload = purchasePayload(values);
+    let error;
+    if (state.editingPurchaseId) {
+      ({ error } = await state.db.rpc('update_purchase', { p_purchase_id: state.editingPurchaseId, ...payload }));
+    } else {
+      ({ error } = await state.db.from('purchases').insert({
+        user_id: state.user.id, purchase_date: payload.p_purchase_date, product: payload.p_product, category: payload.p_category, store_name: payload.p_store_name, mode: payload.p_mode,
+        credit_line: payload.p_credit_line, total_amount: values.totalAmount.toFixed(2), initial_amount: values.initialAmount.toFixed(2), initial_paid_by: payload.p_initial_paid_by,
+        split_type: values.splitType, anny_debt: values.annyDebt.toFixed(2), danny_debt: values.dannyDebt.toFixed(2), installments: values.installments, notes: payload.p_notes, is_shared: values.isShared
+      }));
+    }
     setButton(button, false);
     if (error) return notify(error.message, 'error');
-    event.target.reset();
-    setFormDates();
-    togglePurchaseScope();
-    notify(values.isShared ? 'Compra compartida guardada.' : 'Compra personal guardada.');
+    const edited = Boolean(state.editingPurchaseId);
+    endPurchaseEdit();
+    notify(edited ? 'Compra actualizada.' : (values.isShared ? 'Compra compartida guardada.' : 'Compra personal guardada.'));
     await loadData();
   }
 
@@ -295,12 +392,13 @@
     if (!Number.isFinite(amount) || amount <= 0) return notify('Indica un monto válido.', 'error');
     const button = $('button[type="submit"]', form);
     setButton(button, true);
-    const { error } = await state.db.from('private_entries').insert({ user_id: state.user.id, entry_date: $('[name="entry-date"]', form).value, entry_type: type, amount: amount.toFixed(2), category: $('[name="entry-category"]', form).value.trim(), description: $('[name="entry-description"]', form).value.trim(), notes: $('[name="entry-notes"]', form).value.trim() });
+    const data = { entry_date: $('[name="entry-date"]', form).value, entry_type: type, amount: amount.toFixed(2), category: $('[name="entry-category"]', form).value.trim(), description: $('[name="entry-description"]', form).value.trim(), notes: $('[name="entry-notes"]', form).value.trim() };
+    const editId = form.dataset.editId;
+    const result = editId ? await state.db.from('private_entries').update(data).eq('id', editId) : await state.db.from('private_entries').insert({ user_id: state.user.id, ...data });
     setButton(button, false);
-    if (error) return notify(error.message, 'error');
-    form.reset();
-    $('[name="entry-date"]', form).value = today();
-    notify(type === 'ingreso' ? 'Ingreso privado guardado.' : 'Egreso privado guardado.');
+    if (result.error) return notify(result.error.message, 'error');
+    endEntryEdit(form);
+    notify(editId ? 'Movimiento actualizado.' : (type === 'ingreso' ? 'Ingreso privado guardado.' : 'Egreso privado guardado.'));
     await loadData();
   }
 
@@ -315,14 +413,23 @@
   function updatePaymentLimit() {
     const purchase = state.purchases.find((item) => item.id === $('#payment-purchase-id').value);
     if (!purchase) return;
-    const pending = personPending(purchase, $('#payment-payer').value);
-    $('#payment-amount').max = pending.toFixed(2);
-    $('#payment-purchase-name').textContent = `${purchase.product} · ${$('#payment-payer').value} debe ${formatMoney(pending)}`;
+    const previous = state.editingPaymentId ? state.payments.find((item) => item.id === state.editingPaymentId) : null;
+    const payer = $('#payment-payer').value;
+    const max = personPending(purchase, payer) + (previous?.payer === payer ? Number(previous.amount) : 0);
+    $('#payment-amount').max = max.toFixed(2);
+    $('#payment-purchase-name').textContent = `${purchase.product} · ${payer} debe ${formatMoney(max)}`;
+  }
+
+  function paymentMode(editing = false) {
+    $('#payment-submit').textContent = editing ? 'Guardar cambios' : 'Guardar pago';
+    $('#payment-submit').dataset.originalText = $('#payment-submit').textContent;
+    $('#payment-modal h3').textContent = editing ? 'Editar pago Cashea' : 'Registrar pago Cashea';
   }
 
   function openPaymentModal(purchaseId) {
     const purchase = state.purchases.find((item) => item.id === purchaseId);
     if (!purchase) return;
+    state.editingPaymentId = null;
     const shared = Boolean(purchase.is_shared);
     $('#payment-purchase-id').value = purchase.id;
     $('#payment-scope-badge').textContent = shared ? 'Compartida · Anny y Danny' : 'Personal · sólo tú';
@@ -333,9 +440,37 @@
     $('#payment-reference').value = '';
     $('#receipt-url').value = '';
     $('#payment-date').value = today();
+    paymentMode(false);
     updatePaymentLimit();
     $('#payment-modal').classList.remove('hidden');
     $('#payment-modal').classList.add('flex');
+  }
+
+  function startPaymentEdit(paymentId) {
+    const payment = state.payments.find((item) => item.id === paymentId);
+    const purchase = state.purchases.find((item) => item.id === payment?.purchase_id);
+    if (!payment || !purchase || payment.user_id !== state.user.id) return notify('Sólo puedes editar pagos que registraste tú.', 'error');
+    state.editingPaymentId = payment.id;
+    $('#payment-purchase-id').value = purchase.id;
+    $('#payment-payer').value = payment.payer;
+    $('#payment-payer').disabled = !purchase.is_shared;
+    $('#payment-amount').value = Number(payment.amount).toFixed(2);
+    $('#payment-reference').value = payment.reference || '';
+    $('#receipt-url').value = payment.receipt_url || '';
+    $('#payment-date').value = payment.paid_at;
+    $('#payment-scope-badge').textContent = purchase.is_shared ? 'Compartida · Anny y Danny' : 'Personal · sólo tú';
+    $('#payment-scope-badge').className = `mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${purchase.is_shared ? 'bg-violet-500/10 text-violet-300' : 'bg-wine-500/10 text-red-300'}`;
+    paymentMode(true);
+    updatePaymentLimit();
+    $('#payment-modal').classList.remove('hidden');
+    $('#payment-modal').classList.add('flex');
+  }
+
+  function closePaymentModal() {
+    state.editingPaymentId = null;
+    $('#payment-modal').classList.add('hidden');
+    $('#payment-modal').classList.remove('flex');
+    paymentMode(false);
   }
 
   async function submitPayment(event) {
@@ -346,11 +481,13 @@
     if (amount > max) return notify(`El abono supera el saldo de ${$('#payment-payer').value}.`, 'error');
     const button = $('#payment-submit');
     setButton(button, true);
-    const { error } = await state.db.rpc('record_payment', { p_purchase_id: $('#payment-purchase-id').value, p_payer: $('#payment-payer').value, p_amount: amount, p_reference: $('#payment-reference').value.trim() || null, p_paid_at: $('#payment-date').value, p_receipt_url: $('#receipt-url').value.trim() || null });
+    const payload = { p_payer: $('#payment-payer').value, p_amount: amount, p_reference: $('#payment-reference').value.trim() || null, p_paid_at: $('#payment-date').value, p_receipt_url: $('#receipt-url').value.trim() || null };
+    const editing = state.editingPaymentId;
+    const result = editing ? await state.db.rpc('update_payment', { p_payment_id: editing, ...payload }) : await state.db.rpc('record_payment', { p_purchase_id: $('#payment-purchase-id').value, ...payload });
     setButton(button, false);
-    if (error) return notify(error.message, 'error');
+    if (result.error) return notify(result.error.message, 'error');
     closePaymentModal();
-    notify('Pago guardado y saldo actualizado.');
+    notify(editing ? 'Pago actualizado y saldos recalculados.' : 'Pago guardado y saldo actualizado.');
     await loadData();
   }
 
@@ -360,6 +497,37 @@
     $('#income-date').value = today();
     $('#expense-date').value = today();
     $('#initial-amount').value = $('#initial-amount').value || '0';
+  }
+
+  function resetForms() {
+    $('#auth-form').reset();
+    endPurchaseEdit();
+    endEntryEdit($('#income-form'));
+    endEntryEdit($('#expense-form'));
+    $('#payment-form').reset();
+    closePaymentModal();
+  }
+
+  function clearAccountData() {
+    state.purchases = [];
+    state.payments = [];
+    state.entries = [];
+    ['#wallet-balance', '#income-total', '#expense-total', '#cashea-outstanding', '#income-list-total', '#expense-list-total'].forEach((selector) => { $(selector).textContent = '$0.00'; });
+    $('#purchase-badge').textContent = '0';
+    $('#recent-entries').innerHTML = '<div class="empty-state">Sin movimientos todavía.</div>';
+    $('#purchase-list').innerHTML = '<div class="empty-state">Cargando compras…</div>';
+    $('#payment-list').innerHTML = '<div class="empty-state">Cargando pagos…</div>';
+    $('#income-list').innerHTML = '<div class="empty-state">Sin ingresos registrados.</div>';
+    $('#expense-list').innerHTML = '<div class="empty-state">Sin egresos registrados.</div>';
+    closePaymentModal();
+  }
+
+  function applyIdentityTheme() {
+    const identity = currentIdentity();
+    $('#user-email').textContent = identity.email;
+    $('#identity-badge').textContent = identity.name;
+    $('#identity-badge').className = `hidden rounded-full px-3 py-1 text-xs font-bold sm:inline-flex ${identity.theme === 'danny' ? 'bg-violet-500/15 text-violet-300' : 'bg-wine-500/15 text-red-300'}`;
+    $('#brand-icon').className = `flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black text-white ${identity.theme === 'danny' ? 'bg-gradient-to-br from-violet-500 to-purple-800' : 'bg-gradient-to-br from-red-600 to-wine-700'}`;
   }
 
   async function applySession(session) {
@@ -402,14 +570,24 @@
     });
     $('#logout-button').addEventListener('click', logout);
     $('#refresh-button').addEventListener('click', () => loadData());
-    $$('[data-tab]').forEach((button) => button.addEventListener('click', () => switchTab(button.dataset.tab)));
     $('#purchase-form').addEventListener('submit', submitPurchase);
     $('#purchase-scope').addEventListener('change', togglePurchaseScope);
     $('#split-type').addEventListener('change', toggleCustomSplit);
     ['#total-amount', '#initial-amount', '#danny-debt', '#installments'].forEach((selector) => $(selector).addEventListener('input', updatePurchasePreview));
     $$('.entry-form').forEach((form) => form.addEventListener('submit', submitEntry));
-    $('#purchase-list').addEventListener('click', (event) => { const button = event.target.closest('[data-pay-purchase]'); if (button) openPaymentModal(button.dataset.payPurchase); });
-    ['#income-list', '#expense-list'].forEach((selector) => $(selector).addEventListener('click', (event) => { const button = event.target.closest('[data-delete-entry]'); if (button) deleteEntry(button.dataset.deleteEntry); }));
+    $('#purchase-list').addEventListener('click', (event) => {
+      const pay = event.target.closest('[data-pay-purchase]');
+      const edit = event.target.closest('[data-edit-purchase]');
+      if (pay) openPaymentModal(pay.dataset.payPurchase);
+      if (edit) startPurchaseEdit(edit.dataset.editPurchase);
+    });
+    ['#income-list', '#expense-list'].forEach((selector) => $(selector).addEventListener('click', (event) => {
+      const edit = event.target.closest('[data-edit-entry]');
+      const remove = event.target.closest('[data-delete-entry]');
+      if (edit) startEntryEdit(edit.dataset.editEntry);
+      if (remove) deleteEntry(remove.dataset.deleteEntry);
+    }));
+    $('#payment-list').addEventListener('click', (event) => { const edit = event.target.closest('[data-edit-payment]'); if (edit) startPaymentEdit(edit.dataset.editPayment); });
     $('#payment-payer').addEventListener('change', updatePaymentLimit);
     $('#close-payment-modal').addEventListener('click', closePaymentModal);
     $('#payment-modal').addEventListener('click', (event) => { if (event.target.id === 'payment-modal') closePaymentModal(); });
@@ -418,9 +596,12 @@
 
   async function initialize() {
     try {
+      bindNavigation();
       validateConfig();
       bindEvents();
       setFormDates();
+      setEntryMode($('#income-form'));
+      setEntryMode($('#expense-form'));
       togglePurchaseScope();
       const { data: { session } } = await state.db.auth.getSession();
       await applySession(session);
