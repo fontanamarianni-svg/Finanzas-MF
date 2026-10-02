@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <title>Finanzas MF</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } } };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+</head>
+<body class="min-h-screen bg-slate-950 font-sans text-slate-100">
+  <div id="notice" class="fixed right-4 top-4 z-50 hidden max-w-sm rounded-xl border px-4 py-3 text-sm shadow-2xl"></div>
+
+  <main id="auth-view" class="mx-auto flex min-h-screen max-w-md items-center px-5 py-10">
+    <section class="w-full rounded-3xl border border-slate-800 bg-slate-900 p-7 shadow-2xl shadow-black/30">
+      <div class="mb-8">
+        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-cyan-500 text-xl font-black text-slate-950">MF</div>
+        <h1 class="text-2xl font-extrabold tracking-tight">Finanzas MF</h1>
+        <p class="mt-1 text-sm text-slate-400">Tus compras, cuotas y pagos en un solo lugar.</p>
+      </div>
+      <form id="auth-form" class="space-y-4">
+        <div>
+          <label for="auth-email" class="mb-1.5 block text-sm font-medium text-slate-300">Correo electrónico</label>
+          <input id="auth-email" type="email" required autocomplete="email" class="input" placeholder="tu-correo@ejemplo.com">
+        </div>
+        <div>
+          <label for="auth-password" class="mb-1.5 block text-sm font-medium text-slate-300">Contraseña</label>
+          <input id="auth-password" type="password" required minlength="8" autocomplete="current-password" class="input" placeholder="Mínimo 8 caracteres">
+        </div>
+        <button id="auth-submit" class="btn-primary w-full" type="submit">Iniciar sesión</button>
+      </form>
+      <button id="auth-toggle" class="mt-5 w-full text-sm font-semibold text-emerald-400 hover:text-emerald-300">Crear una cuenta</button>
+      <p id="auth-help" class="mt-5 text-center text-xs leading-5 text-slate-500">Tu información se guarda de forma privada en tu cuenta.</p>
+    </section>
+  </main>
+
+  <main id="app-view" class="hidden pb-12">
+    <header class="border-b border-slate-800 bg-slate-950/90 backdrop-blur">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 font-black text-slate-950">MF</div>
+          <div><h1 class="font-bold">Finanzas MF</h1><p id="user-email" class="text-xs text-slate-400"></p></div>
+        </div>
+        <button id="logout-button" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white">Salir</button>
+      </div>
+    </header>
+
+    <div class="mx-auto max-w-6xl px-5 py-7">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div><p class="text-sm font-semibold text-emerald-400">RESUMEN</p><h2 class="text-3xl font-extrabold tracking-tight">Control de cuotas</h2></div>
+        <button id="refresh-button" class="btn-secondary">Actualizar datos</button>
+      </div>
+
+      <section class="mb-8 grid gap-4 sm:grid-cols-3">
+        <article class="metric-card"><p>Compras activas</p><strong id="active-count">0</strong></article>
+        <article class="metric-card"><p>Saldo pendiente</p><strong id="outstanding-total">$0.00</strong></article>
+        <article class="metric-card"><p>Pagado de financiamiento</p><strong id="paid-total">$0.00</strong></article>
+      </section>
+
+      <div class="grid gap-7 lg:grid-cols-[390px_1fr]">
+        <section class="rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6">
+          <div class="mb-5"><h3 class="text-lg font-bold">Registrar compra</h3><p class="mt-1 text-sm text-slate-400">La inicial se descuenta antes de dividir las cuotas.</p></div>
+          <form id="purchase-form" class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="label" for="purchase-date">Fecha</label><input class="input" id="purchase-date" type="date" required></div>
+              <div><label class="label" for="mode">Tipo</label><select class="input" id="mode"><option value="cotidiano">Cotidiano</option><option value="principal">Principal</option></select></div>
+            </div>
+            <div><label class="label" for="product">Producto o servicio</label><input class="input" id="product" required maxlength="120" placeholder="Ej.: Teléfono"></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="label" for="category">Categoría</label><input class="input" id="category" maxlength="60" placeholder="Ej.: Tecnología"></div>
+              <div><label class="label" for="store">Tienda</label><input class="input" id="store" maxlength="120" placeholder="Opcional"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="label" for="total-amount">Monto total ($)</label><input class="input" id="total-amount" type="number" min="0.01" step="0.01" required></div>
+              <div><label class="label" for="initial-amount">Inicial ($)</label><input class="input" id="initial-amount" type="number" min="0" step="0.01" value="0" required></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="label" for="initial-payer">Pagó la inicial</label><select class="input" id="initial-payer"><option>Anny</option><option>Danny</option></select></div>
+              <div><label class="label" for="credit-line">Línea de crédito</label><select class="input" id="credit-line"><option>Anny</option><option>Danny</option></select></div>
+            </div>
+            <div><label class="label" for="split-type">División</label><select class="input" id="split-type"><option value="mitad">Mitad y mitad</option><option value="personalizado">Monto personalizado de Danny</option></select></div>
+            <div id="danny-debt-wrap" class="hidden"><label class="label" for="danny-debt">Deuda que asume Danny ($)</label><input class="input" id="danny-debt" type="number" min="0" step="0.01" value="0"></div>
+            <div><label class="label" for="installments">Cantidad de cuotas</label><select class="input" id="installments"><option value="1">1 cuota</option><option value="2">2 cuotas</option><option value="3">3 cuotas</option><option value="6">6 cuotas</option><option value="12">12 cuotas</option></select></div>
+            <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm"><div class="flex justify-between text-slate-400"><span>Financiamiento</span><strong id="preview-financed" class="text-white">$0.00</strong></div><div class="mt-1 flex justify-between text-slate-400"><span>Anny / cuota</span><strong id="preview-anny" class="text-white">$0.00</strong></div><div class="mt-1 flex justify-between text-slate-400"><span>Danny / cuota</span><strong id="preview-danny" class="text-white">$0.00</strong></div></div>
+            <div><label class="label" for="notes">Notas</label><textarea class="input min-h-20 resize-y" id="notes" maxlength="500" placeholder="Opcional"></textarea></div>
+            <button id="purchase-submit" class="btn-primary w-full" type="submit">Guardar compra</button>
+          </form>
+        </section>
+
+        <section>
+          <div class="mb-4 flex items-center justify-between"><div><h3 class="text-lg font-bold">Compras activas</h3><p class="text-sm text-slate-400">Registra cada abono para actualizar el saldo.</p></div><span id="purchase-badge" class="rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-300">0</span></div>
+          <div id="purchase-list" class="space-y-4"><div class="empty-state">Cargando compras…</div></div>
+          <div class="mt-8 mb-4"><h3 class="text-lg font-bold">Historial de pagos</h3></div>
+          <div id="payment-list" class="space-y-3"><div class="empty-state">Cargando pagos…</div></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div id="payment-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+    <form id="payment-form" class="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+      <div class="mb-5 flex items-start justify-between gap-4"><div><h3 class="text-lg font-bold">Registrar pago</h3><p id="payment-purchase-name" class="mt-1 text-sm text-slate-400"></p></div><button id="close-payment-modal" type="button" class="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white">✕</button></div>
+      <input id="payment-purchase-id" type="hidden">
+      <div class="space-y-4"><div><label class="label" for="payment-payer">¿Quién pagó?</label><select class="input" id="payment-payer"><option>Anny</option><option>Danny</option></select></div><div><label class="label" for="payment-amount">Monto abonado ($)</label><input class="input" id="payment-amount" type="number" min="0.01" step="0.01" required></div><div><label class="label" for="payment-reference">Referencia</label><input class="input" id="payment-reference" maxlength="120" placeholder="Opcional"></div><div><label class="label" for="payment-date">Fecha del pago</label><input class="input" id="payment-date" type="date" required></div><div><label class="label" for="receipt-url">Enlace del comprobante</label><input class="input" id="receipt-url" type="url" maxlength="500" placeholder="Opcional"></div></div>
+      <button id="payment-submit" class="btn-primary mt-6 w-full" type="submit">Guardar pago</button>
+    </form>
+  </div>
+
+  <style>
+    .input { width: 100%; border-radius: .75rem; border: 1px solid rgb(51 65 85); background: rgb(15 23 42); padding: .65rem .75rem; font-size: .875rem; color: white; outline: none; } .input:focus { border-color: rgb(52 211 153); box-shadow: 0 0 0 3px rgb(16 185 129 / .12); } .label { margin-bottom: .35rem; display: block; font-size: .75rem; font-weight: 600; color: rgb(203 213 225); } .btn-primary { border-radius: .75rem; background: linear-gradient(135deg, rgb(52 211 153), rgb(6 182 212)); padding: .7rem 1rem; font-size: .875rem; font-weight: 800; color: rgb(15 23 42); transition: opacity .15s; } .btn-primary:hover { opacity: .9; } .btn-primary:disabled, .btn-secondary:disabled { cursor: not-allowed; opacity: .55; } .btn-secondary { border: 1px solid rgb(51 65 85); border-radius: .75rem; padding: .6rem .85rem; font-size: .875rem; font-weight: 600; color: rgb(203 213 225); } .btn-secondary:hover { background: rgb(30 41 59); color: white; } .metric-card { border: 1px solid rgb(30 41 59); border-radius: 1rem; background: rgb(15 23 42); padding: 1.1rem; } .metric-card p { font-size: .8rem; color: rgb(148 163 184); } .metric-card strong { display: block; margin-top: .4rem; font-size: 1.55rem; color: white; } .empty-state { border: 1px dashed rgb(51 65 85); border-radius: 1rem; padding: 2rem; text-align: center; color: rgb(148 163 184); font-size: .875rem; }
+  </style>
+  <script src="app.js"></script>
+</body>
+</html>
